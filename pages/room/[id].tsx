@@ -71,18 +71,23 @@ export default function RoomPage() {
   useEffect(() => {
     if (!router.isReady || !roomId || !role) return;
 
+    // Vor dem Erstellen einer neuen Verbindung die alte schließen, falls sie existiert
+    if (pcRef.current) {
+        pcRef.current.close();
+    }
+
     const pc = new RTCPeerConnection({ iceServers: [STUN_SERVER] });
     pcRef.current = pc;
     let isMounted = true;
-
+    
     pc.onicecandidate = async (event) => {
-      if (event.candidate) {
+        if (event.candidate) {
         await fetch(`/api/room/${roomId}/candidate`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ candidate: event.candidate }),
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ candidate: event.candidate }),
         });
-      }
+        }
     };
 
     if (role === "host") {
@@ -217,9 +222,12 @@ export default function RoomPage() {
     pollCandidates();
 
     return () => {
-      isMounted = false;
-      pc.close();
-    };
+        isMounted = false;
+        // Beim Verlassen der Seite die PeerConnection schließen
+        if (pcRef.current) {
+          pcRef.current.close();
+        }
+      };
   }, [router.isReady, roomId, role]);
 
   return (
