@@ -198,26 +198,28 @@ export default function RoomPage() {
       getOfferAndSendAnswer();
     }
 
-    // 📡 ICE candidates pollen
     const pollCandidates = async () => {
-      try {
-        const res = await fetch(`/api/room/${roomId}/candidates`);
-        if (res.ok) {
-          const data = await res.json();
-          for (const c of data.candidates) {
-            try {
-              await pc.addIceCandidate(new RTCIceCandidate(c));
-            } catch (err) {
-              console.warn("ICE Candidate Fehler:", err);
+        if (!pcRef.current) return; // Wenn keine Verbindung besteht, nichts tun
+      
+        try {
+          const res = await fetch(`/api/room/${roomId}/candidates`);
+          if (res.ok) {
+            const data = await res.json();
+            for (const c of data.candidates) {
+              try {
+                await pcRef.current.addIceCandidate(new RTCIceCandidate(c));
+              } catch (err) {
+                console.warn("ICE Candidate Fehler:", err);
+              }
             }
           }
+        } catch (err) {
+          console.error("Fehler beim Polling:", err);
         }
-      } catch (err) {
-        console.error("Fehler beim Polling:", err);
-      }
-
-      setTimeout(pollCandidates, 2000);
-    };
+      
+        setTimeout(pollCandidates, 2000); // Weiter Polling
+      };
+      
 
     pollCandidates();
 
