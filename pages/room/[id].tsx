@@ -54,183 +54,158 @@ export default function RoomPage() {
         console.warn("Unbekannte Aktion:", action);
     }
   };
+
+  async function createAndSendOffer(pc: RTCPeerConnection, roomId: string | string[]) {
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+  
+    await fetch(`/api/room/${roomId}/offer`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ offer }),
+    });
+  
+    const pollAnswer = async () => {
+      const res = await fetch(`/api/room/${roomId}/answer`);
+      if (res.status === 200) {
+        const data = await res.json();
+        const remoteDesc = new RTCSessionDescription(data.answer);
+        if (pc.signalingState !== "closed") {
+          await pc.setRemoteDescription(remoteDesc);
+        }
+      } else {
+        setTimeout(pollAnswer, 1000);
+      }
+    };
+  
+    pollAnswer();
+  }
   
 
-  // 🛡️ Falls role/roomId noch nicht da ist → automatisch reloaden
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      if (router.isReady && !router.query.role) {
-        console.warn("❗ Rolle fehlt – Seite wird neu geladen...");
-        location.reload();
+  async function getOfferAndSendAnswer(
+    pc: RTCPeerConnection,
+    roomId: string | string[],
+    isMounted: boolean
+  ) {
+    const res = await fetch(`/api/room/${roomId}/offer`);
+    if (res.status !== 200 || !isMounted) return;
+  
+    const data = await res.json();
+    const remoteDesc = new RTCSessionDescription(data.offer);
+  
+    if (pc.signalingState === "closed") return;
+  
+    await pc.setRemoteDescription(remoteDesc);
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+  
+    await fetch(`/api/room/${roomId}/answer`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ answer }),
+    });
+  }
+  
+
+  async function pollCandidates(pc: RTCPeerConnection, roomId: string | string[]) {
+    if (!pc) return;
+  
+    try {
+      const res = await fetch(`/api/room/${roomId}/candidates`);
+      if (res.ok) {
+        const { candidates } = await res.json();
+        for (const c of candidates) {
+          try {
+            await pc.addIceCandidate(new RTCIceCandidate(c));
+          } catch (err) {
+            console.warn("Fehler bei ICE-Kandidat:", err);
+          }
+        }
       }
-    }, 500); // nach 0.5s prüfen
-
-    return () => clearTimeout(timeout);
-  }, [router.isReady]);
-
-  useEffect(() => {
-    if (!router.isReady || !roomId || !role) return;
-
-    // Vor dem Erstellen einer neuen Verbindung die alte schließen, falls sie existiert
-    if (pcRef.current) {
-        pcRef.current.close();
+    } catch (err) {
+      console.error("Polling-Fehler:", err);
     }
+  
+    setTimeout(() => pollCandidates(pc, roomId), 2000);
+  }
+  
 
-    const pc = new RTCPeerConnection({ iceServers: [STUN_SERVER] });
-    pcRef.current = pc;
-    let isMounted = true;
+  function handleMessage(event: MessageEvent) {
+    try {
+      const msg = JSON.parse(event.data);
+      if (msg.type === "file") {
+        setRemoteFileName(msg.name);
+      } else if (msg.type === "control") {
+        handleControl(msg.action, "remote", msg.time);
+      }
+    } catch (err) {
+      console.warn("Ungültige Nachricht:", err);
+    }
+  }
+  
+  
+
+  // 📌 1. Effekt: Verbindung aufbauen
+    useEffect(() => {
+        if (!router.isReady || !roomId || !role) return;
     
-    pc.onicecandidate = async (event) => {
+        const pc = new RTCPeerConnection({ iceServers: [STUN_SERVER] });
+        pcRef.current = pc;
+    
+        let isMounted = true;
+    
+        pc.onicecandidate = async (event) => {
         if (event.candidate) {
-        await fetch(`/api/room/${roomId}/candidate`, {
+            await fetch(`/api/room/${roomId}/candidate`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ candidate: event.candidate }),
-        });
+            });
         }
-    };
-
-    if (role === "host") {
-      const dataChannel = pc.createDataChannel("sync");
-      dcRef.current = dataChannel;
-
-      dataChannel.onopen = () => {
-        dataChannel.send("Hallo vom Host");
-        setIsConnected(true);
-      };
-
-      dataChannel.onmessage = (event) => {
-        try {
-          const msg = JSON.parse(event.data);
-          if (msg.type === "file") {
-            setRemoteFileName(msg.name);
-          } else {
-          }
-          if (msg.type === "control") {
-            handleControl(msg.action, "remote", msg.time);
-          }     
-        } catch {
+        };
+    
+        if (role === "host") {
+        const dc = pc.createDataChannel("sync");
+        dcRef.current = dc;
+    
+        dc.onopen = () => {
+            setIsConnected(true);
+            dc.send("Hallo vom Host");
+        };
+    
+        dc.onmessage = handleMessage;
+        createAndSendOffer(pc, roomId);
         }
-      };
-      
-      
-
-      const createAndSendOffer = async () => {
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-
-        await fetch(`/api/room/${roomId}/offer`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ offer }),
-        });
-
-        const pollAnswer = async () => {
-          const res = await fetch(`/api/room/${roomId}/answer`);
-          if (res.status === 200) {
-            const data = await res.json();
-            const remoteDesc = new RTCSessionDescription(data.answer);
-            if (pc.signalingState !== "closed") {
-              await pc.setRemoteDescription(remoteDesc);
-            }
-          } else {
-            setTimeout(pollAnswer, 1000);
-          }
+    
+        if (role === "join") {
+        pc.ondatachannel = (event) => {
+            const dc = event.channel;
+            dcRef.current = dc;
+    
+            dc.onopen = () => {
+            setIsConnected(true);
+            dc.send("Hallo vom Joiner");
+            };
+    
+            dc.onmessage = handleMessage;
         };
-
-        pollAnswer();
-      };
-
-      createAndSendOffer();
-    } else if (role === "join") {
-      pc.ondatachannel = (event) => {
-        const dataChannel = event.channel;
-        dcRef.current = dataChannel;
-
-        dataChannel.onopen = () => {
-          dataChannel.send("Hallo vom Joiner");
-          setIsConnected(true);
-        };
-
-        dataChannel.onmessage = (event) => {
-            try {
-              const msg = JSON.parse(event.data);
-              if (msg.type === "file") {
-                setRemoteFileName(msg.name);
-              } else {
-              }
-              if (msg.type === "control") {
-                handleControl(msg.action, "remote", msg.time);
-              }              
-              
-            } catch {
+    
+        getOfferAndSendAnswer(pc, roomId, isMounted);
+        }
+    
+        pollCandidates(pc, roomId);
+    
+        return () => {
+            isMounted = false;
+            if (pcRef.current) {
+              pcRef.current.close();
+              pcRef.current = null;
             }
+            dcRef.current = null;
           };
           
-          
-      };
-
-      const getOfferAndSendAnswer = async () => {
-        const res = await fetch(`/api/room/${roomId}/offer`);
-        if (res.status === 200 && isMounted) {
-          const data = await res.json();
-          const remoteDesc = new RTCSessionDescription(data.offer);
-
-          if (pc.signalingState === "closed") {
-            console.warn("🚫 PC ist geschlossen – keine Antwort möglich.");
-            return;
-          }
-
-          await pc.setRemoteDescription(remoteDesc);
-
-          const answer = await pc.createAnswer();
-          await pc.setLocalDescription(answer);
-
-          await fetch(`/api/room/${roomId}/answer`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ answer }),
-          });
-
-        }
-      };
-
-      getOfferAndSendAnswer();
-    }
-
-    const pollCandidates = async () => {
-        if (!pcRef.current) return; // Wenn keine Verbindung besteht, nichts tun
-      
-        try {
-          const res = await fetch(`/api/room/${roomId}/candidates`);
-          if (res.ok) {
-            const data = await res.json();
-            for (const c of data.candidates) {
-              try {
-                await pcRef.current.addIceCandidate(new RTCIceCandidate(c));
-              } catch (err) {
-                console.warn("ICE Candidate Fehler:", err);
-              }
-            }
-          }
-        } catch (err) {
-          console.error("Fehler beim Polling:", err);
-        }
-      
-        setTimeout(pollCandidates, 2000); // Weiter Polling
-      };
-      
-
-    pollCandidates();
-
-    return () => {
-        isMounted = false;
-        // Beim Verlassen der Seite die PeerConnection schließen
-        if (pcRef.current) {
-          pcRef.current.close();
-        }
-      };
-  }, [router.isReady, roomId, role]);
+    }, [router.isReady, roomId, role]);
+    
 
   return (
     <main style={{ padding: "2rem" }}>
