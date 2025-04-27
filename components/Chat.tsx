@@ -24,7 +24,30 @@ export default function ChatComponent({ dcRef }: { dcRef: React.RefObject<RTCDat
         return `${emoji} <span style="color:${nameColor}">${name}</span>`;
     };
 
-    const sendMessage = () => {
+    // Nachricht an den Server senden
+    const sendMessageToAPI = async (messageObject: MessageObject) => {
+        try {
+            const response = await fetch(`/api/chat/send`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    roomId,
+                    sender: messageObject.name,
+                    message: messageObject.text,
+                }),
+            });
+            if (!response.ok) {
+                console.error("Fehler beim Senden der Nachricht an die API");
+            }
+        } catch (error) {
+            console.error("Fehler beim Senden der Nachricht:", error);
+        }
+    };
+
+    // Nachricht im lokalen Zustand hinzufügen
+    const sendMessage = async () => {
         if (message.trim() && dcRef.current?.readyState === "open" && !isSendingMessage.current) {
             isSendingMessage.current = true;
             const name = getNameWithEmoji(role as string);
@@ -32,37 +55,53 @@ export default function ChatComponent({ dcRef }: { dcRef: React.RefObject<RTCDat
                 name: name,
                 text: message.trim()
             };
-            const encodedMessage = JSON.stringify(messageObject);
 
             // Nachricht lokal hinzufügen
             setMessages((prev) => [...prev, messageObject]);
 
+            // Nachricht an den Data Channel senden
             try {
-                dcRef.current.send(encodedMessage);
+                dcRef.current.send(JSON.stringify(messageObject));
+                await sendMessageToAPI(messageObject); // Nachricht über die API senden
                 setMessage(""); // Eingabefeld leeren
             } catch (error) {
                 console.error("Fehler beim Senden der Nachricht:", error);
-                // Hier könntest du dem Benutzer eine Fehlermeldung anzeigen
             } finally {
                 isSendingMessage.current = false;
             }
         }
     };
 
+    // Nachricht vom Data Channel empfangen
     const handleReceivedMessage = (event: MessageEvent) => {
         try {
             const decodedMessage: MessageObject = JSON.parse(event.data);
             setMessages((prev) => [...prev, decodedMessage]);
         } catch (error) {
             console.error("Fehler beim Verarbeiten der empfangenen Nachricht:", error);
-            // Hier könntest du den Benutzer informieren oder die Nachricht anders behandeln
         }
     };
 
+    // Beim Drücken der Enter-Taste Nachricht senden
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();
             sendMessage();
+        }
+    };
+
+    // Laden der Nachrichten vom Server
+    const fetchMessages = async () => {
+        try {
+            const response = await fetch(`/api/chat/get?roomId=${roomId}`);
+            if (response.ok) {
+                const data = await response.json();
+                setMessages(data.messages || []);
+            } else {
+                console.error("Fehler beim Abrufen der Nachrichten");
+            }
+        } catch (error) {
+            console.error("Fehler beim Abrufen der Nachrichten:", error);
         }
     };
 
@@ -72,15 +111,12 @@ export default function ChatComponent({ dcRef }: { dcRef: React.RefObject<RTCDat
             dc.onmessage = handleReceivedMessage;
             dc.onopen = () => {
                 console.log("Data channel is open in ChatComponent");
-                // Hier könntest du dem Benutzer signalisieren, dass der Chat bereit ist
             };
             dc.onclose = () => {
                 console.log("Data channel is closed in ChatComponent");
-                // Hier könntest du den Benutzer informieren und ggf. eine Wiederverbindung versuchen
             };
             dc.onerror = (error) => {
                 console.error("Data channel error in ChatComponent:", error);
-                // Hier könntest du den Benutzer informieren und die Fehlerursache protokollieren
             };
         }
 
@@ -93,6 +129,13 @@ export default function ChatComponent({ dcRef }: { dcRef: React.RefObject<RTCDat
             }
         };
     }, [dcRef]);
+
+    useEffect(() => {
+        // Nachrichten beim Laden des Chats abrufen
+        if (roomId) {
+            fetchMessages();
+        }
+    }, [roomId]);
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });

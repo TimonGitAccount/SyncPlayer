@@ -1,4 +1,4 @@
-// pages/api/room/[id]/answer.ts
+// pages/api/room/[roomId]/answer.ts
 import { NextApiRequest, NextApiResponse } from "next";
 import { getRoom } from "../../../../lib/signalingStore";
 

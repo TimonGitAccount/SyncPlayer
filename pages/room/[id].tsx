@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import { FaCog, FaUndo } from "react-icons/fa";
 import ChatComponent from "../../components/Chat";
+import { FaComment } from "react-icons/fa6";
 
 const STUN_SERVER = { urls: "stun:stun.l.google.com:19302" };
 
@@ -15,7 +16,9 @@ export default function RoomPage() {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [remoteFileName, setRemoteFileName] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false); // Für das Anzeigen des Einstellungsbereichs
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false); // Steuert die Sichtbarkeit der Einstellungen
+  const [isChatOpen, setIsChatOpen] = useState(false); // Steuert die Sichtbarkeit des Chats
+
   const [brightness, setBrightness] = useState(1); // Helligkeit
   const [contrast, setContrast] = useState(1); // Kontrast
   const [saturation, setSaturation] = useState(1); // Sättigung
@@ -296,6 +299,18 @@ export default function RoomPage() {
             </>
           )}
 
+          {/* Chat-Icon in der oberen Leiste */}
+          <div
+            style={{
+              fontSize: "1.5rem",
+              cursor: "pointer",
+              color: "#fff",
+            }}
+            onClick={() => setIsChatOpen(!isChatOpen)} // Toggle Chat-Visibility
+          >
+            <FaComment />
+          </div>
+
           {remoteFileName && (
             <span style={{ fontSize: "0.9rem" }}>
               🧑‍🤝‍🧑 <strong>{remoteFileName}</strong>
@@ -465,13 +480,13 @@ export default function RoomPage() {
           )}
         </div>
 
-        <div style={{ display: "flex", width: "20%", overflow: "hidden" }}>
+        {isChatOpen && <div style={{ display: "flex", width: "20%", overflow: "hidden" }}>
           <div style={{ flexGrow: 1, backgroundColor: "#111" }}>
             {/* Hier dein Hauptinhalt (z.B. Video) */}
           </div>
 
           <ChatComponent dcRef={dcRef} />
-        </div>
+        </div>}
 
 
       </div>
