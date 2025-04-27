@@ -149,7 +149,8 @@ export default function ChatComponent({ dcRef }: { dcRef: React.RefObject<RTCDat
 
             <div
                 style={{
-                    height: "700px",
+                    height: "650px",
+                    maxHeight: "650px",
                     overflowY: "auto",
                     padding: "0.75rem",
                     backgroundColor: "#1a1a1a",
