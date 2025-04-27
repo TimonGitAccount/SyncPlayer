@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
+import { FaCog, FaUndo } from "react-icons/fa";
 
 const STUN_SERVER = { urls: "stun:stun.l.google.com:19302" };
 
@@ -13,6 +14,11 @@ export default function RoomPage() {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [remoteFileName, setRemoteFileName] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false); // Für das Anzeigen des Einstellungsbereichs
+  const [brightness, setBrightness] = useState(1); // Helligkeit
+  const [contrast, setContrast] = useState(1); // Kontrast
+  const [saturation, setSaturation] = useState(1); // Sättigung
+
   
   const ignoreNextSeekRef = useRef(false);
 
@@ -264,12 +270,31 @@ export default function RoomPage() {
             }}
           />
 
-          {/* Dateinamen anzeigen */}
+          {/* Dateinamen anzeigen und Einstellungen */}
           {file && (
-            <span style={{ fontSize: "0.9rem" }}>
-              📁 <strong>{file.name}</strong>
-            </span>
+            <>
+              <div style={{ display: "flex", alignItems: "center", gap: "1rem", flexWrap: "wrap" }}>
+                {/* Dateiname anzeigen */}
+                <span style={{ fontSize: "0.9rem" }}>
+                  📁 <strong>{file.name}</strong>
+                </span>
+
+                {/* Einstellungs-Symbol, nur wenn eine Datei vorhanden ist */}
+                <div
+                  style={{
+                    fontSize: "1.5rem",
+                    cursor: "pointer",
+                    color: "#fff",
+                    marginLeft: "1rem", // Ein bisschen Abstand vom Dateinamen
+                  }}
+                  onClick={() => setIsSettingsOpen(!isSettingsOpen)}
+                >
+                  <FaCog />
+                </div>
+              </div>
+            </>
           )}
+
           {remoteFileName && (
             <span style={{ fontSize: "0.9rem" }}>
               🧑‍🤝‍🧑 <strong>{remoteFileName}</strong>
@@ -314,6 +339,81 @@ export default function RoomPage() {
         </div>
       </div>
 
+      {/* Neue Leiste, die sich öffnet, wenn das Einstellungssymbol geklickt wird */}
+      {isSettingsOpen && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "1rem",
+            padding: "1rem 2rem",
+            backgroundColor: "#222",
+            color: "#fff",
+            zIndex: 999, // Damit sie oberhalb des Videos bleibt
+            transition: "transform 0.3s ease",
+            transform: isSettingsOpen ? "translateY(0)" : "translateY(-100%)",
+          }}
+        >
+          {/* Helligkeit */}
+          <label>
+            Helligkeit:
+            <input
+              type="range"
+              min="0.5"
+              max="2"
+              step="0.1"
+              value={brightness}
+              onChange={(e) => setBrightness(parseFloat(e.target.value))}
+            />
+          </label>
+
+          {/* Kontrast */}
+          <label>
+            Kontrast:
+            <input
+              type="range"
+              min="0.5"
+              max="2"
+              step="0.1"
+              value={contrast}
+              onChange={(e) => setContrast(parseFloat(e.target.value))}
+            />
+          </label>
+
+          {/* Sättigung */}
+          <label>
+            Sättigung:
+            <input
+              type="range"
+              min="0"
+              max="2"
+              step="0.1"
+              value={saturation}
+              onChange={(e) => setSaturation(parseFloat(e.target.value))}
+            />
+          </label>
+
+          {/* Reset Knopf */}
+          <button
+            style={{
+              padding: "0.5rem 1rem",
+              backgroundColor: "#333",
+              color: "#fff",
+              border: "none",
+              borderRadius: "5px",
+              cursor: "pointer",
+            }}
+            onClick={() => {
+              setBrightness(1);
+              setContrast(1);
+              setSaturation(1);
+            }}
+          >
+            <FaUndo />
+          </button>
+        </div>
+      )}
+
       {/* Video-Bereich */}
       <div
         style={{
@@ -330,7 +430,13 @@ export default function RoomPage() {
             ref={videoRef}
             src={videoUrl || undefined}
             controls
-            style={{ width: "100%", maxWidth: "1200px", height: "auto", borderRadius: "12px" }}
+            style={{
+              width: "100%",
+              maxWidth: "1200px",
+              height: "auto",
+              borderRadius: "12px",
+              filter: `brightness(${brightness}) contrast(${contrast}) saturate(${saturation})`, // Filter anwenden
+            }}
             onPlay={() => handleControl("play", "local")}
             onPause={() => handleControl("pause", "local")}
             onSeeked={() => {
@@ -342,7 +448,7 @@ export default function RoomPage() {
                 handleControl("seek", "local", videoRef.current.currentTime);
               }
             }}
-          />
+          />        
         ) : (
           <p style={{ color: "#888" }}>Bitte lade eine Video-Datei hoch.</p>
         )}
