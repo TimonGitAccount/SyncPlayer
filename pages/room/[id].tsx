@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import { FaCog, FaUndo } from "react-icons/fa";
+import ChatComponent from "../../components/Chat";
 
 const STUN_SERVER = { urls: "stun:stun.l.google.com:19302" };
 
@@ -414,45 +415,67 @@ export default function RoomPage() {
         </div>
       )}
 
-      {/* Video-Bereich */}
+      {/* Neuer Bereich: Video + Chat nebeneinander */}
       <div
         style={{
           display: "flex",
+          flexDirection: "row",
           justifyContent: "center",
-          alignItems: "center",
+          alignItems: "flex-start",
           padding: "2rem",
+          gap: "2rem",
           minHeight: "calc(100vh - 80px)",
           backgroundColor: "#111",
         }}
       >
-        {videoUrl ? (
-          <video
-            ref={videoRef}
-            src={videoUrl || undefined}
-            controls
-            style={{
-              width: "100%",
-              maxWidth: "1200px",
-              height: "auto",
-              borderRadius: "12px",
-              filter: `brightness(${brightness}) contrast(${contrast}) saturate(${saturation})`, // Filter anwenden
-            }}
-            onPlay={() => handleControl("play", "local")}
-            onPause={() => handleControl("pause", "local")}
-            onSeeked={() => {
-              if (ignoreNextSeekRef.current) {
-                ignoreNextSeekRef.current = false;
-                return;
-              }
-              if (videoRef.current) {
-                handleControl("seek", "local", videoRef.current.currentTime);
-              }
-            }}
-          />        
-        ) : (
-          <p style={{ color: "#888" }}>Bitte lade eine Video-Datei hoch.</p>
-        )}
+        <div
+          style={{
+            flex: 1, // Video bekommt den meisten Platz
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          {videoUrl ? (
+            <video
+              ref={videoRef}
+              src={videoUrl || undefined}
+              controls
+              style={{
+                width: "100%",
+                maxWidth: "900px",
+                height: "auto",
+                borderRadius: "12px",
+                filter: `brightness(${brightness}) contrast(${contrast}) saturate(${saturation})`,
+              }}
+              onPlay={() => handleControl("play", "local")}
+              onPause={() => handleControl("pause", "local")}
+              onSeeked={() => {
+                if (ignoreNextSeekRef.current) {
+                  ignoreNextSeekRef.current = false;
+                  return;
+                }
+                if (videoRef.current) {
+                  handleControl("seek", "local", videoRef.current.currentTime);
+                }
+              }}
+            />
+          ) : (
+            <p style={{ color: "#888" }}>Bitte lade eine Video-Datei hoch.</p>
+          )}
+        </div>
+
+        <div style={{ display: "flex", width: "20%", overflow: "hidden" }}>
+          <div style={{ flexGrow: 1, backgroundColor: "#111" }}>
+            {/* Hier dein Hauptinhalt (z.B. Video) */}
+          </div>
+
+          <ChatComponent dcRef={dcRef} />
+        </div>
+
+
       </div>
+
     </main>
 
   );
