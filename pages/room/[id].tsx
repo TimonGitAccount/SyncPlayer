@@ -208,67 +208,146 @@ export default function RoomPage() {
     
 
   return (
-    <main style={{ padding: "2rem" }}>
-        <h1>📡 Raum: {roomId}</h1>
-        <p>Rolle: {role === "host" ? "👑 Host" : "🙋 Joiner"}</p>
-        <p>Status: {isConnected ? "🟢 Verbunden" : "🔄 Verbindung wird aufgebaut..."}</p>
+    <main style={{ padding: "0", margin: "0" }}>
+      {/* Menüleiste */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "1rem 2rem",
+          backgroundColor: "#222",
+          color: "#fff",
+          position: "sticky",
+          top: 0,
+          zIndex: 1000,
+          flexWrap: "wrap", // für mobile/responsive fallback
+          gap: "1rem",
+        }}
+      >
+        {/* Linker Bereich */}
+        <div style={{ display: "flex", alignItems: "center", gap: "1rem", flexWrap: "wrap" }}>
+          {/* Rolle */}
+          <span style={{ fontSize: "0.9rem" }}>
+            {role === "host" ? "👑 Host" : "🙋 Joiner"}
+          </span>
 
-        <div style={{ marginTop: "2rem" }}>
-            <label>
-            🎥 Video-Datei wählen:
-            <input
-                type="file"
-                accept="video/*"
-                onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      setFile(file);
-                      const url = URL.createObjectURL(file);
-                      setVideoUrl(url);
-                  
-                      // 📡 Dateinamen an anderen senden
-                      if (dcRef.current?.readyState === "open") {
-                        dcRef.current.send(JSON.stringify({ type: "file", name: file.name }));
-                      }
-                    }
-                  }}
-                  
-            />
-            </label>
+          {/* Video-Datei wählen */}
+          <label
+            htmlFor="fileUpload"
+            style={{
+              display: "inline-block",
+              padding: "0.5rem 1rem",
+              backgroundColor: "#555",
+              borderRadius: "8px",
+              cursor: "pointer",
+            }}
+          >
+            🎥 Video wählen
+          </label>
+          <input
+            id="fileUpload"
+            type="file"
+            accept="video/*"
+            style={{ display: "none" }}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) {
+                setFile(file);
+                const url = URL.createObjectURL(file);
+                setVideoUrl(url);
+
+                if (dcRef.current?.readyState === "open") {
+                  dcRef.current.send(JSON.stringify({ type: "file", name: file.name }));
+                }
+              }
+            }}
+          />
+
+          {/* Dateinamen anzeigen */}
+          {file && (
+            <span style={{ fontSize: "0.9rem" }}>
+              📁 <strong>{file.name}</strong>
+            </span>
+          )}
+          {remoteFileName && (
+            <span style={{ fontSize: "0.9rem" }}>
+              🧑‍🤝‍🧑 <strong>{remoteFileName}</strong>
+            </span>
+          )}
         </div>
 
-        {file && (
-            <div style={{ marginTop: "1rem" }}>
-              {file && <p>📁 Deine Datei: <strong>{file.name}</strong></p>}
-              {remoteFileName && <p>🧑‍🤝‍🧑 Andere Person: <strong>{remoteFileName}</strong></p>}
-            </div>
-          
-        )}
+        {/* Rechter Bereich */}
+        <div style={{ display: "flex", alignItems: "center", gap: "1rem", flexWrap: "wrap" }}>
+          {/* Link-Teilen Button */}
+          <button
+            style={{
+              padding: "0.5rem 1rem",
+              backgroundColor: "#0070f3",
+              color: "#fff",
+              border: "none",
+              borderRadius: "8px",
+              cursor: "pointer",
+              fontSize: "0.9rem",
+            }}
+            onClick={() => {
+              const shareUrl = `${window.location.origin}/room/${roomId}?role=join`;
+              if (navigator.share) {
+                navigator.share({
+                  title: "Sync Player Raum",
+                  text: "Trete meinem Raum bei!",
+                  url: shareUrl,
+                });
+              } else {
+                navigator.clipboard.writeText(shareUrl);
+                alert("Join-Link kopiert!");
+              }
+            }}
+          >
+            🔗 Link teilen
+          </button>
 
-        {videoUrl && (
-            <video
+          {/* Verbindungsstatus */}
+          <span style={{ fontSize: "0.9rem" }}>
+            {isConnected ? "🟢 Verbunden" : "🔄 Verbindung wird aufgebaut..."}
+          </span>
+        </div>
+      </div>
+
+      {/* Video-Bereich */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          padding: "2rem",
+          minHeight: "calc(100vh - 80px)",
+          backgroundColor: "#111",
+        }}
+      >
+        {videoUrl ? (
+          <video
             ref={videoRef}
             src={videoUrl || undefined}
             controls
-            style={{ width: "100%", maxWidth: "800px", marginTop: "1rem" }}
+            style={{ width: "100%", maxWidth: "1200px", height: "auto", borderRadius: "12px" }}
             onPlay={() => handleControl("play", "local")}
             onPause={() => handleControl("pause", "local")}
             onSeeked={() => {
-                if (ignoreNextSeekRef.current) {
-                  ignoreNextSeekRef.current = false;
-                  return;
-                }
-              
-                if (videoRef.current) {
-                  handleControl("seek", "local", videoRef.current.currentTime);
-                }
-              }}
-               
+              if (ignoreNextSeekRef.current) {
+                ignoreNextSeekRef.current = false;
+                return;
+              }
+              if (videoRef.current) {
+                handleControl("seek", "local", videoRef.current.currentTime);
+              }
+            }}
           />
-          
-          
+        ) : (
+          <p style={{ color: "#888" }}>Bitte lade eine Video-Datei hoch.</p>
         )}
-        </main>
+      </div>
+    </main>
 
   );
 }
