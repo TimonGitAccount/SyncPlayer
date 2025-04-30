@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
-import { FaCog, FaUndo } from "react-icons/fa";
+import { FaCog, FaUndo, FaCamera } from "react-icons/fa";
 import ChatComponent from "../../components/Chat";
 import { FaComment } from "react-icons/fa6";
 
@@ -27,6 +27,39 @@ export default function RoomPage() {
   const ignoreNextSeekRef = useRef(false);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  const handleScreenshot = () => {
+    const video = videoRef.current;
+    if (!video) return;
+  
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+  
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+  
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+  
+      const timestamp = new Date()
+        .toISOString()
+        .replace(/[:.]/g, "-")
+        .slice(0, 19);
+      const videoName = file?.name?.split(".")[0] || "screenshot";
+      const filename = `${videoName}-${timestamp}.png`;
+  
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    }, "image/png");
+  };
+  
 
   const handleControl = (
     action: "play" | "pause" | "seek",
@@ -295,6 +328,19 @@ export default function RoomPage() {
                 >
                   <FaCog />
                 </div>
+
+                <div
+                  style={{
+                    fontSize: "1.5rem",
+                    cursor: "pointer",
+                    color: "#fff",
+                  }}
+                  onClick={handleScreenshot}
+                  title="Screenshot aufnehmen"
+                >
+                  <FaCamera />
+                </div>
+
               </div>
             </>
           )}
