@@ -23,6 +23,7 @@ export default function RoomPage() {
   const [contrast, setContrast] = useState(1); // Kontrast
   const [saturation, setSaturation] = useState(1); // Sättigung
   const [showEditor, setShowEditor] = useState(false);
+  const [timestamp, setTimestamp] = useState<string | null>(null);
 
   const screenshotRef = useRef<HTMLImageElement | null>(null);
   const ignoreNextSeekRef = useRef(false);
@@ -49,6 +50,9 @@ export default function RoomPage() {
       img.onload = () => {
         screenshotRef.current = img;
         setShowEditor(true);
+  
+        // Speichern des Timestamps beim Bearbeiten des Screenshots
+        setTimestamp(new Date(video.currentTime * 1000).toISOString());
       };
       img.src = url;
     }, "image/png");
@@ -72,10 +76,12 @@ export default function RoomPage() {
       if (!blob) return;
       const url = URL.createObjectURL(blob);
   
-      const timestamp = new Date()
+      // Zeitstempel aus dem Video für den Dateinamen
+      const timestamp = new Date(video.currentTime * 1000)
         .toISOString()
         .replace(/[:.]/g, "-")
         .slice(0, 19);
+  
       const videoName = file?.name?.split(".")[0] || "screenshot";
       const filename = `${videoName}-${timestamp}.png`;
   
@@ -84,6 +90,9 @@ export default function RoomPage() {
       a.download = filename;
       a.click();
       URL.revokeObjectURL(url);
+  
+      // Speichern des Timestamps
+      setTimestamp(timestamp);
     }, "image/png");
   };
   
@@ -577,6 +586,11 @@ export default function RoomPage() {
         <ImageEditorModal
           image={screenshotRef.current}
           onClose={() => setShowEditor(false)}
+          brightness={brightness * 100} // Hier stellen wir den Wert als Prozentsatz ein (0-200%)
+          contrast={contrast * 100} // Hier stellen wir den Wert als Prozentsatz ein (0-200%)
+          saturation={saturation * 100} // Hier stellen wir den Wert als Prozentsatz ein (0-200%)
+          title={file?.name || "Screenshot"} // Den Titel des Bildes (Dateiname)
+          timestamp={timestamp} // Zeitstempel für das Bild aus dem Video
         />
       )}
 

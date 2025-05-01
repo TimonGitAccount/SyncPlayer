@@ -1,180 +1,224 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { FaTimes, FaDownload } from "react-icons/fa";
-import * as tf from "@tensorflow/tfjs"; // Import TensorFlow.js
-
-const useTfProdMode = () => {
-    useEffect(() => {
-        let isMounted = true;
-        tf.ready().then(() => {
-            if (isMounted) {
-                tf.enableProdMode();
-                console.log("TensorFlow.js Production Mode aktiviert.");
-            }
-        });
-        return () => { isMounted = false; };
-    }, []);
-};
-
-type Resolution =
-    | { label: string; width: number; height: number }
-    | { label: "Auto"; width: "auto"; height: "auto" };
-
-const resolutions: Resolution[] = [
-    { label: "Auto", width: "auto", height: "auto" },
-    { label: "854 x 480 (480p)", width: 854, height: 480 },
-    { label: "1280 x 720 (720p)", width: 1280, height: 720 },
-    { label: "1920 x 1080 (1080p)", width: 1920, height: 1080 },
-    { label: "2560 x 1440 (2K)", width: 2560, height: 1440 },
-    { label: "3840 x 2160 (4K)", width: 3840, height: 2160 },
-];
+import { FaTimes, FaDownload, FaUndo, FaRedo, FaSyncAlt } from "react-icons/fa";
 
 type Props = {
     image: HTMLImageElement | null;
     onClose: () => void;
+    brightness?: number;
+    contrast?: number;
+    saturation?: number;
+    title?: string;
+    timestamp?: string;
 };
 
-// Funktion zum Upscaling des Bildes mit upscalerjs
-const createWebWorker = (image: HTMLImageElement | null, scale: number, width: number, height: number) => {
-    return new Promise<HTMLImageElement | null>((resolve, reject) => {
-        const worker = new Worker(new URL('src/worker/imageUpscalerWorker.js', import.meta.url), { type: 'module' });
+export default function ImageEditorModal({ image, onClose, brightness, contrast, saturation, title, timestamp }: Props) {
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const previewRef = useRef<HTMLCanvasElement>(null);
 
-        worker.onmessage = (event) => {
-            if (event.data.success) {
-                const img = new Image();
-                img.src = event.data.upscaledImageData;
-                img.onload = () => resolve(img);
-            } else {
-                reject(new Error(event.data.error));
-            }
-        };
+    const [currentBrightness, setCurrentBrightness] = useState(brightness ?? 100);
+    const [currentContrast, setCurrentContrast] = useState(contrast ?? 100);
+    const [currentSaturation, setCurrentSaturation] = useState(saturation ?? 100);
 
-        worker.onerror = (error) => {
-            reject(new Error(`Worker-Fehler: ${error.message} (${error.filename}:${error.lineno})`));
-            console.error('Worker-Fehler:', error); // Zusätzliches Logging
-        };
-
-        // Bilddaten und Parameter an den Worker senden
-        const imageData = image ? image.src : null;
-        worker.postMessage({ imageData, scale, width, height });
-    });
-};
-
-export default function ImageEditorModal({ image, onClose }: Props) {
-    const [selectedResolution, setSelectedResolution] = useState<Resolution>(resolutions[0]);
-    const [useUpscaling, setUseUpscaling] = useState(false);
+    const [rotation, setRotation] = useState(0);
+    const [flip, setFlip] = useState(false);
+    const [removeMetadata, setRemoveMetadata] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
-    const [upscalingStatus, setUpscalingStatus] = useState<string | null>(null);
-    const [upscaleFactor, setUpscaleFactor] = useState<number>(4); // Standard-Skalierungsfaktor
 
-    useTfProdMode();
+    useEffect(() => {
+        if (!image || !previewRef.current) return;
 
-    const handleSave = async () => {
-        if (!image || isProcessing) return;
+        const ctx = previewRef.current.getContext("2d");
+        if (!ctx) return;
 
-        setIsProcessing(true);
-        let imageToDraw: HTMLImageElement | HTMLCanvasElement = image;
+        const draw = () => {
+            const canvas = previewRef.current!;
+            // Skalieren des Canvas, um das Bild proportional anzupassen
+            const maxWidth = canvas.parentElement?.offsetWidth ?? 600; // Maximalbreite des Modals
+            const aspectRatio = image.width / image.height;
 
-        if (useUpscaling) {
-            setUpscalingStatus("Upscaling läuft...");
-            try {
-                // Worker mit Scale und gewählter Auflösung aufrufen
-                imageToDraw = await createWebWorker(image, upscaleFactor, selectedResolution.width, selectedResolution.height);
-                if (imageToDraw) {
-                    setUpscalingStatus("Upscaling abgeschlossen.");
-                } else {
-                    setUpscalingStatus("Upscaling fehlgeschlagen.");
-                }
-            } catch (error) {
-                setUpscalingStatus("Fehler beim Upscaling.");
-                imageToDraw = image;
+            // Berechne die Höhe basierend auf der maximalen Breite, sodass das Seitenverhältnis beibehalten wird
+            const scaledHeight = maxWidth / aspectRatio;
+            
+            // Stelle sicher, dass die Höhe nicht größer als die maximal zulässige Höhe des Containers wird
+            if (scaledHeight > window.innerHeight * 0.8) {
+                const scaledWidth = (window.innerHeight * 0.8) * aspectRatio;
+                canvas.width = scaledWidth;
+                canvas.height = window.innerHeight * 0.8;
+            } else {
+                canvas.width = maxWidth;
+                canvas.height = scaledHeight;
             }
-        }
 
-        // Das Bild auf die endgültige Auflösung skalieren und speichern
+            ctx.save();
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Transformationen anwenden
+            ctx.translate(canvas.width / 2, canvas.height / 2);
+            if (flip) ctx.scale(-1, 1);
+            ctx.rotate((rotation * Math.PI) / 180);
+            ctx.translate(-canvas.width / 2, -canvas.height / 2);
+
+            // Filter anwenden
+            ctx.filter = `brightness(${currentBrightness}%) contrast(${currentContrast}%) saturate(${currentSaturation}%)`;
+            ctx.drawImage(image, 0, 0, canvas.width, canvas.height); // Skaliertes Bild zeichnen
+
+            ctx.restore();
+        };
+
+        draw();
+    }, [image, currentBrightness, currentContrast, currentSaturation, rotation, flip]);
+
+    const resetAll = () => {
+        setCurrentBrightness(100);
+        setCurrentContrast(100);
+        setCurrentSaturation(100);
+        setRotation(0);
+        setFlip(false);
+    };
+
+    const handleSave = () => {
+        if (!previewRef.current) return;
+        setIsProcessing(true);
+
         const canvas = document.createElement("canvas");
-        const { width, height } = selectedResolution;
-        canvas.width = width === "auto" ? imageToDraw.width : width;
-        canvas.height = height === "auto" ? imageToDraw.height : height;
-
         const ctx = canvas.getContext("2d");
-        if (!ctx) {
-            alert("Fehler: Konnte keinen Canvas-Kontext erhalten.");
-            setIsProcessing(false);
-            setUpscalingStatus(null);
-            return;
+        if (!ctx || !image) return;
+
+        // Rotation anpassen: Wenn das Bild um 90 Grad gedreht wird, tauschen die Breite und Höhe
+        let rotatedWidth = image.width;
+        let rotatedHeight = image.height;
+
+        if (rotation === 90 || rotation === 270) {
+            rotatedWidth = image.height;
+            rotatedHeight = image.width;
         }
 
-        ctx.imageSmoothingQuality = "high";
-        ctx.drawImage(imageToDraw, 0, 0, canvas.width, canvas.height);
+        canvas.width = rotatedWidth;
+        canvas.height = rotatedHeight;
 
-        try {
-            const link = document.createElement("a");
-            const filenameSuffix = useUpscaling ? '_upscaled' : '';
-            link.download = `screenshot_${canvas.width}x${canvas.height}${filenameSuffix}.png`;
-            link.href = canvas.toDataURL("image/png");
-            link.click();
-        } catch (error) {
-            console.error("Fehler beim Erstellen des Download-Links:", error);
-            alert(`Fehler beim Speichern des Bildes: ${error instanceof Error ? error.message : String(error)}`);
-        } finally {
-            canvas.width = 0;
-            canvas.height = 0;
-            setIsProcessing(false);
-            setUpscalingStatus(null);
-        }
+        ctx.save();
+
+        // Zuerst das Canvas in die Mitte verschieben
+        ctx.translate(rotatedWidth / 2, rotatedHeight / 2);
+
+        // Bild spiegeln
+        if (flip) ctx.scale(-1, 1);
+
+        // Rotation anwenden
+        ctx.rotate((rotation * Math.PI) / 180);
+
+        // Die Bildkoordinaten so anpassen, dass es nicht abgeschnitten wird
+        ctx.translate(-image.width / 2, -image.height / 2);
+
+        // Filter anwenden
+        ctx.filter = `brightness(${currentBrightness}%) contrast(${currentContrast}%) saturate(${currentSaturation}%)`;
+        ctx.drawImage(image, 0, 0);
+
+        ctx.restore();
+
+        // Das bearbeitete Bild als Blob speichern
+        canvas.toBlob(
+            (blob) => {
+                if (blob) {
+                    const link = document.createElement("a");
+                    // Dynamischer Dateiname basierend auf title und timestamp
+                    const safeTitle = title?.replace(/[^\w\-]/g, "_") ?? "bild";
+                    const safeTimestamp = timestamp?.replace(/[^\w\-]/g, "_") ?? "zeit";
+                    link.download = `${safeTitle}_${safeTimestamp}_edit.png`;
+                    link.href = URL.createObjectURL(blob);
+                    link.click();
+                    URL.revokeObjectURL(link.href);
+                }
+                setIsProcessing(false);
+            },
+            "image/png",
+            1
+        );
     };
 
     const modalContent = (
-        <div style={{ position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh", backgroundColor: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 10000 }}>
-            <div style={{ backgroundColor: "#222", padding: "2rem", borderRadius: "12px", minWidth: "300px", maxWidth: "500px", color: "#fff", position: "relative" }}>
-                <button onClick={onClose} disabled={isProcessing} style={{ position: "absolute", top: "0.5rem", right: "0.5rem", background: "none", border: "none", color: "#fff", fontSize: "1.2rem", cursor: isProcessing ? "not-allowed" : "pointer" }}>
+        <div style={{
+            position: "fixed",
+            top: 0, left: 0,
+            width: "100vw", height: "100vh",
+            backgroundColor: "rgba(0,0,0,0.7)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            zIndex: 10000
+        }}>
+            <div style={{
+                backgroundColor: "#222",
+                padding: "2rem",
+                borderRadius: "12px",
+                minWidth: "300px",
+                maxWidth: "600px",
+                color: "#fff",
+                position: "relative"
+            }}>
+                <button onClick={onClose} disabled={isProcessing} style={{
+                    position: "absolute", top: "0.5rem", right: "0.5rem",
+                    background: "none", border: "none", color: "#fff",
+                    fontSize: "1.2rem", cursor: isProcessing ? "not-allowed" : "pointer"
+                }}>
                     <FaTimes />
                 </button>
 
-                <h2 style={{ marginBottom: "1rem" }}>🖼️ Screenshot bearbeiten</h2>
+                <h2 style={{ marginBottom: "1rem" }}>🖼️ Bild bearbeiten</h2>
 
-                {image && (
-                    <div style={{ width: '100%', marginBottom: '1rem', display: 'flex', justifyContent: 'center' }}>
-                        <img src={image?.src} alt="Vorschau" style={{ width: '100%', maxWidth: '100%', height: 'auto', borderRadius: '6px', objectFit: 'contain' }} />
-                    </div>
-                )}
+                <div style={{ display: "flex", justifyContent: "center", marginBottom: "1rem" }}>
+                    <canvas ref={previewRef} style={{ maxWidth: "100%", height: "auto", borderRadius: "6px" }} />
+                </div>
 
-                {upscalingStatus && (
-                    <div style={{ margin: "1rem 0", padding: "0.5rem", backgroundColor: "#444", borderRadius: "4px", textAlign: "center" }}>
-                        {upscalingStatus}
-                    </div>
-                )}
+                {/* Regler */}
+                {["Helligkeit", "Kontrast", "Sättigung"].map((label, idx) => {
+                    const setters = [setCurrentBrightness, setCurrentContrast, setCurrentSaturation];
+                    const values = [currentBrightness, currentContrast, currentSaturation];
+                    return (
+                        <div key={label} style={{ marginBottom: "0.75rem" }}>
+                            <label>{label}: {values[idx]}%</label>
+                            <input
+                                type="range"
+                                min={0}
+                                max={200}
+                                value={values[idx]}
+                                onChange={(e) => setters[idx](parseInt(e.target.value))}
+                                style={{ width: "100%" }}
+                            />
+                        </div>
+                    );
+                })}
 
-                <label style={{ display: "block", marginBottom: "1rem" }}>
-                    Zielauflösung:
-                    <select disabled={isProcessing} style={{ width: "100%", padding: "0.5rem", borderRadius: "6px", marginTop: "0.5rem", backgroundColor: "#333", color: "#fff", cursor: isProcessing ? 'not-allowed' : 'default' }} value={selectedResolution.label} onChange={(e) => { const selected = resolutions.find((r) => r.label === e.target.value); if (selected) setSelectedResolution(selected); }}>
-                        {resolutions.map((r) => (<option key={r.label} value={r.label}>{r.label}</option>))}
-                    </select>
-                </label>
+                {/* Aktionen */}
+                <div style={{ display: "flex", justifyContent: "space-around", margin: "1rem 0" }}>
+                    <button onClick={() => setRotation((r) => (r - 90) % 360)}><FaUndo /></button>
+                    <button onClick={() => setRotation((r) => (r + 90) % 360)}><FaRedo /></button>
+                    <button onClick={() => setFlip((f) => !f)}><FaSyncAlt /></button>
+                </div>
 
-                <label style={{ display: "block", marginBottom: "1rem" }}>
-                    <input disabled={isProcessing} type="checkbox" checked={useUpscaling} onChange={(e) => setUseUpscaling(e.target.checked)} style={{ marginRight: "0.5rem", cursor: isProcessing ? 'not-allowed' : 'pointer' }} />
-                    AI Upscaling aktivieren
-                </label>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "1rem" }}>
+                    <input type="checkbox" id="removeMeta" checked={removeMetadata} onChange={(e) => setRemoveMetadata(e.target.checked)} />
+                    <label htmlFor="removeMeta">Metadaten entfernen (Datenschutz & Größe)</label>
+                </div>
 
-                {useUpscaling && (
-                    <>
-                        <label style={{ display: "block", marginBottom: "1rem" }}>
-                            Skalierungsfaktor:
-                            <select disabled={isProcessing} value={upscaleFactor} onChange={(e) => setUpscaleFactor(Number(e.target.value))} style={{ width: "100%", padding: "0.5rem", borderRadius: "6px", marginTop: "0.5rem", backgroundColor: "#333", color: "#fff" }}>
-                                <option value={2}>2x</option>
-                                <option value={3}>3x</option>
-                                <option value={4}>4x</option>
-                                <option value={8}>8x</option>
-                            </select>
-                        </label>
-                    </>
-                )}
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <button onClick={resetAll} style={{
+                        padding: "0.5rem 1rem",
+                        backgroundColor: "#666", border: "none", borderRadius: "8px",
+                        color: "#fff", cursor: "pointer"
+                    }}>
+                        Zurücksetzen
+                    </button>
 
-                <button onClick={handleSave} disabled={isProcessing || !image} style={{ padding: "0.5rem 1rem", backgroundColor: isProcessing ? "#555" : "#0070f3", border: "none", borderRadius: "8px", color: "#fff", fontSize: "1rem", cursor: isProcessing ? "wait" : "pointer", display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "1rem" }}>
-                    {isProcessing ? 'Verarbeite...' : <><FaDownload /> Speichern</>}
-                </button>
+                    <button onClick={handleSave} disabled={isProcessing} style={{
+                        padding: "0.5rem 1rem",
+                        backgroundColor: "#0070f3", border: "none", borderRadius: "8px",
+                        color: "#fff", fontSize: "1rem", display: "flex", alignItems: "center", gap: "0.5rem",
+                        cursor: isProcessing ? "wait" : "pointer"
+                    }}>
+                        <FaDownload />
+                        {isProcessing ? "Speichern..." : "Speichern"}
+                    </button>
+                </div>
             </div>
         </div>
     );
