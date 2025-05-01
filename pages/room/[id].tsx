@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
-import { FaCog, FaUndo, FaCamera } from "react-icons/fa";
+import { FaCog, FaUndo, FaCamera, FaEdit } from "react-icons/fa";
 import ChatComponent from "../../components/Chat";
 import { FaComment } from "react-icons/fa6";
+import ImageEditorModal from "@/components/ImageEditorModal";
 
 const STUN_SERVER = { urls: "stun:stun.l.google.com:19302" };
 
@@ -18,15 +19,41 @@ export default function RoomPage() {
   const [isConnected, setIsConnected] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false); // Steuert die Sichtbarkeit der Einstellungen
   const [isChatOpen, setIsChatOpen] = useState(false); // Steuert die Sichtbarkeit des Chats
-
   const [brightness, setBrightness] = useState(1); // Helligkeit
   const [contrast, setContrast] = useState(1); // Kontrast
   const [saturation, setSaturation] = useState(1); // Sättigung
+  const [showEditor, setShowEditor] = useState(false);
 
-  
+  const screenshotRef = useRef<HTMLImageElement | null>(null);
   const ignoreNextSeekRef = useRef(false);
-
   const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  const handleScreenshotEdit = () => {
+    const video = videoRef.current;
+    if (!video) return;
+  
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+  
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+  
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+  
+      const img = new Image();
+      img.onload = () => {
+        screenshotRef.current = img;
+        setShowEditor(true);
+      };
+      img.src = url;
+    }, "image/png");
+  };
+  
 
   const handleScreenshot = () => {
     const video = videoRef.current;
@@ -341,6 +368,15 @@ export default function RoomPage() {
                   <FaCamera />
                 </div>
 
+                {/* Editor öffnen */}
+                <div
+                  style={{ fontSize: "1.5rem", cursor: "pointer", color: "#fff" }}
+                  onClick={handleScreenshotEdit}
+                  title="Screenshot bearbeiten"
+                >
+                  <FaEdit />
+                </div>
+
               </div>
             </>
           )}
@@ -536,6 +572,14 @@ export default function RoomPage() {
 
 
       </div>
+
+      {showEditor && screenshotRef.current && (
+        <ImageEditorModal
+          image={screenshotRef.current}
+          onClose={() => setShowEditor(false)}
+        />
+      )}
+
 
     </main>
 
