@@ -590,7 +590,7 @@ export default function RoomPage() {
           contrast={contrast * 100} // Hier stellen wir den Wert als Prozentsatz ein (0-200%)
           saturation={saturation * 100} // Hier stellen wir den Wert als Prozentsatz ein (0-200%)
           title={file?.name || "Screenshot"} // Den Titel des Bildes (Dateiname)
-          timestamp={timestamp} // Zeitstempel für das Bild aus dem Video
+          timestamp={timestamp ?? undefined}
         />
       )}
 
