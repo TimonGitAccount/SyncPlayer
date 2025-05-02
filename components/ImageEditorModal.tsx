@@ -21,7 +21,6 @@ export default function ImageEditorModal({
     title,
     timestamp
 }: Props) {
-    const canvasRef = useRef<HTMLCanvasElement>(null);
     const previewRef = useRef<HTMLCanvasElement>(null);
 
     const [currentBrightness, setCurrentBrightness] = useState(brightness ?? 100);
@@ -30,7 +29,6 @@ export default function ImageEditorModal({
 
     const [rotation, setRotation] = useState(0);
     const [flip, setFlip] = useState(false);
-    const [removeMetadata, setRemoveMetadata] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
 
     const [adjustColors, setAdjustColors] = useState(false);
@@ -44,14 +42,20 @@ export default function ImageEditorModal({
     // Neue State-Variablen für Auflösung
     const [selectedResolution, setSelectedResolution] = useState("original"); // "original", "720p", "1080p", etc.
 
-    const resolutions = {
-        original: { width: image?.width ?? 600, height: image?.height ?? 600 },
+    type Resolution = {
+        width: number;
+        height: number;
+      };
+      
+      const resolutions: { [key: string]: Resolution } = {
+        original: { width: 1920, height: 1080 },
         "480p": { width: 854, height: 480 },
         "720p": { width: 1280, height: 720 },
         "1080p": { width: 1920, height: 1080 },
         "1440p": { width: 2560, height: 1440 },
-        "4k": { width: 3840, height: 2160 }
-    };
+        "4k": { width: 3840, height: 2160 },
+      };
+      
     
     useEffect(() => {
         if (!image || !previewRef.current) return;
@@ -316,37 +320,72 @@ export default function ImageEditorModal({
                     <div style={{ display: "flex", alignItems: "center", flex: 1 }}>
                         <label style={{ marginRight: "0.5rem" }}>Auflösung:</label>
                         <select
-                            id="resolution"
-                            value={selectedResolution}
-                            onChange={(e) => setSelectedResolution(e.target.value)}
-                            style={{
-                                padding: "0.5rem",
-                                fontSize: "1rem",
-                                borderRadius: "4px",
-                                color: "#333", // Dunklere Schriftfarbe
-                                backgroundColor: "#fff", // Weißer Hintergrund für bessere Sichtbarkeit
-                                flex: 1, // Nimmt den verfügbaren Platz ein
-                                height: "3rem", // Gleiche Höhe wie der Speicherbutton
-                            }}
+                        id="resolution"
+                        value={selectedResolution}
+                        onChange={(e) => setSelectedResolution(e.target.value)}
+                        style={{
+                            padding: "0.5rem",
+                            fontSize: "1rem",
+                            borderRadius: "4px",
+                            color: "#333", // Dunklere Schriftfarbe
+                            backgroundColor: "#fff", // Weißer Hintergrund für bessere Sichtbarkeit
+                            flex: 1, // Nimmt den verfügbaren Platz ein
+                            height: "3rem", // Gleiche Höhe wie der Speicherbutton
+                        }}
                         >
-                            <option value="original">Original</option>
-                            <option value="480p">480p</option>
-                            <option value="720p">720p</option>
-                            <option value="1080p">1080p</option>
-                            <option value="2k">2k</option>
-                            <option value="4k">4k</option>
+                        <option value="original">Original</option>
+                        <option value="480p">480p</option>
+                        <option value="720p">720p</option>
+                        <option value="1080p">1080p</option>
+                        <option value="2k">2k</option>
+                        <option value="4k">4k</option>
                         </select>
                     </div>
 
-                    <div style={{ textAlign: "center", marginLeft: "1rem" }}>
-                        <button onClick={handleSave} disabled={isProcessing} style={{
-                            padding: "0.75rem", backgroundColor: "#007bff", color: "#fff", border: "none", borderRadius: "4px",
-                            cursor: isProcessing ? "not-allowed" : "pointer", height: "3rem", display: "flex", alignItems: "center", justifyContent: "center"
-                        }}>
-                            {isProcessing ? <FaSpinner style={{ animation: "spin 1s infinite linear" }} /> : <FaDownload />}
+                    <div style={{ display: "flex", alignItems: "center", marginLeft: "1rem" }}>
+                        {/* Reset Button */}
+                        <button
+                        onClick={resetAll}
+                        style={{
+                            backgroundColor: "#f44336", // Rote Farbe für den Reset
+                            color: "#fff",
+                            border: "none",
+                            borderRadius: "50%",
+                            padding: "0.75rem",
+                            cursor: "pointer",
+                            height: "3rem",
+                            width: "3rem",
+                            display: "flex",
+                            justifyContent: "center",
+                            alignItems: "center",
+                            marginRight: "1rem", // Abstand zum Speichern-Button
+                        }}
+                        >
+                        <FaRedo />
+                        </button>
+
+                        {/* Save Button */}
+                        <button
+                        onClick={handleSave}
+                        disabled={isProcessing}
+                        style={{
+                            padding: "0.75rem",
+                            backgroundColor: "#007bff",
+                            color: "#fff",
+                            border: "none",
+                            borderRadius: "4px",
+                            cursor: isProcessing ? "not-allowed" : "pointer",
+                            height: "3rem",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                        }}
+                        >
+                        {isProcessing ? <FaSpinner style={{ animation: "spin 1s infinite linear" }} /> : <FaDownload />}
                         </button>
                     </div>
-                </div>
+                    </div>
+
 
             </div>
         </div>
