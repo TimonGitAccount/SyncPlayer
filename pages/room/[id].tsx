@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
-import { FaCog, FaUndo, FaCamera, FaEdit } from "react-icons/fa";
+import { FaCog, FaCamera, FaEdit } from "react-icons/fa";
 import ChatComponent from "../../components/Chat";
 import { FaComment } from "react-icons/fa6";
 import ImageEditorModal from "@/components/ImageEditorModal";
+import VideoSettingsBar from "@/components/VideoSettingsBar";
 
 const STUN_SERVER = { urls: "stun:stun.l.google.com:19302" };
 
@@ -30,6 +31,13 @@ export default function RoomPage() {
   const screenshotRef = useRef<HTMLImageElement | null>(null);
   const ignoreNextSeekRef = useRef(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  // Funktion für den Reset-Button (kann auch direkt inline übergeben werden)
+  const handleSettingsReset = () => {
+    setBrightness(1);
+    setContrast(1);
+    setSaturation(1);
+  };
 
   // Funktion zum Hinzufügen von Untertiteln
   const handleSubtitleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -495,77 +503,15 @@ export default function RoomPage() {
 
       {/* Neue Leiste, die sich öffnet, wenn das Einstellungssymbol geklickt wird */}
       {isSettingsOpen && (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "1rem",
-            padding: "1rem 2rem",
-            backgroundColor: "#222",
-            color: "#fff",
-            zIndex: 999, // Damit sie oberhalb des Videos bleibt
-            transition: "transform 0.3s ease",
-            transform: isSettingsOpen ? "translateY(0)" : "translateY(-100%)",
-          }}
-        >
-          {/* Helligkeit */}
-          <label>
-            Helligkeit:
-            <input
-              type="range"
-              min="0.5"
-              max="2"
-              step="0.1"
-              value={brightness}
-              onChange={(e) => setBrightness(parseFloat(e.target.value))}
-            />
-          </label>
-
-          {/* Kontrast */}
-          <label>
-            Kontrast:
-            <input
-              type="range"
-              min="0.5"
-              max="2"
-              step="0.1"
-              value={contrast}
-              onChange={(e) => setContrast(parseFloat(e.target.value))}
-            />
-          </label>
-
-          {/* Sättigung */}
-          <label>
-            Sättigung:
-            <input
-              type="range"
-              min="0"
-              max="2"
-              step="0.1"
-              value={saturation}
-              onChange={(e) => setSaturation(parseFloat(e.target.value))}
-            />
-          </label>
-
-          {/* Reset Knopf */}
-          <button
-            style={{
-              padding: "0.5rem 1rem",
-              backgroundColor: "#333",
-              color: "#fff",
-              border: "none",
-              borderRadius: "5px",
-              cursor: "pointer",
-            }}
-            onClick={() => {
-              setBrightness(1);
-              setContrast(1);
-              setSaturation(1);
-            }}
-          >
-            <FaUndo />
-          </button>
-        </div>
+        <VideoSettingsBar
+          brightness={brightness}
+          contrast={contrast}
+          saturation={saturation}
+          onBrightnessChange={setBrightness} // Direkte Übergabe der State Setter
+          onContrastChange={setContrast}
+          onSaturationChange={setSaturation}
+          onReset={handleSettingsReset}     // Übergabe der Reset-Funktion
+        />
       )}
 
       {/* Neuer Bereich: Video + Chat nebeneinander */}

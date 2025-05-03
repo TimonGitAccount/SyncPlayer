@@ -80,7 +80,7 @@ export default function ImageEditorModal({
             ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
             ctx.restore();
 
-            let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
             const data = imageData.data;
 
             if (adjustColors) {
@@ -177,7 +177,7 @@ export default function ImageEditorModal({
     
         ctx.restore();
     
-        let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const data = imageData.data;
     
         if (adjustColors) {
