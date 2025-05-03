@@ -391,16 +391,20 @@ export default function RoomPage() {
           )}
 
           {/* Chat-Icon in der oberen Leiste */}
-          <div
-            style={{
-              fontSize: "1.5rem",
-              cursor: "pointer",
-              color: "#fff",
-            }}
-            onClick={() => setIsChatOpen(!isChatOpen)} // Toggle Chat-Visibility
-          >
-            <FaComment />
-          </div>
+          { isConnected && (
+            <div
+              style={{
+                fontSize: "1.5rem",
+                cursor: "pointer",
+                color: "#fff",
+              }}
+              onClick={() => setIsChatOpen(!isChatOpen)} // Toggle Chat-Visibility
+            >
+              <FaComment />
+            </div>
+          )
+
+          }
 
           {remoteFileName && (
             <span style={{ fontSize: "0.9rem" }}>
