@@ -24,10 +24,32 @@ export default function RoomPage() {
   const [saturation, setSaturation] = useState(1); // Sättigung
   const [showEditor, setShowEditor] = useState(false);
   const [timestamp, setTimestamp] = useState<string | null>(null);
+  const [subtitleFile, setSubtitleFile] = useState<File | null>(null);
+
 
   const screenshotRef = useRef<HTMLImageElement | null>(null);
   const ignoreNextSeekRef = useRef(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  // Funktion zum Hinzufügen von Untertiteln
+  const handleSubtitleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSubtitleFile(file);
+
+      // Erstelle eine URL für die Untertitel-Datei
+      const url = URL.createObjectURL(file);
+
+      if (videoRef.current) {
+        const track = document.createElement("track");
+        track.kind = "subtitles"; // Art des Tracks (Untertitel)
+        track.label = "Deutsch"; // Die Sprache des Tracks
+        track.srclang = "de"; // Sprache (deutsch hier als Beispiel)
+        track.src = url; // Setze die URL der Untertitel-Datei
+        videoRef.current.appendChild(track); // Füge den Track dem Video hinzu
+      }
+    }
+  };
 
   const handleScreenshotEdit = () => {
     const video = videoRef.current;
@@ -322,7 +344,7 @@ export default function RoomPage() {
               cursor: "pointer",
             }}
           >
-            🎥 Video wählen
+            🎥 
           </label>
           <input
             id="fileUpload"
@@ -341,6 +363,27 @@ export default function RoomPage() {
                 }
               }
             }}
+          />
+
+          {/* Untertitel-Datei wählen */}
+          <label
+            htmlFor="subtitleUpload"
+            style={{
+              display: "inline-block",
+              padding: "0.5rem 1rem",
+              backgroundColor: "#555",
+              borderRadius: "8px",
+              cursor: "pointer",
+            }}
+          >
+            📜 
+          </label>
+          <input
+            id="subtitleUpload"
+            type="file"
+            accept=".vtt"
+            style={{ display: "none" }}
+            onChange={handleSubtitleUpload}
           />
 
           {/* Dateinamen anzeigen und Einstellungen */}
@@ -576,10 +619,6 @@ export default function RoomPage() {
         </div>
 
         {isChatOpen && <div style={{ display: "flex", width: "20%", overflow: "hidden" }}>
-          <div style={{ flexGrow: 1, backgroundColor: "#111" }}>
-            {/* Hier dein Hauptinhalt (z.B. Video) */}
-          </div>
-
           <ChatComponent dcRef={dcRef} />
         </div>}
 
