@@ -5,6 +5,7 @@ import ChatComponent from "../../components/Chat";
 import { FaComment } from "react-icons/fa6";
 import ImageEditorModal from "@/components/ImageEditorModal";
 import VideoSettingsBar from "@/components/VideoSettingsBar";
+import FileUploadButton from "@/components/FileUploadButton"
 
 const STUN_SERVER = { urls: "stun:stun.l.google.com:19302" };
 
@@ -214,7 +215,31 @@ export default function RoomPage() {
       body: JSON.stringify({ answer }),
     });
   }
-  
+
+  const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setFile(file);
+      // Vorherige URL freigeben, falls vorhanden, um Speicherlecks zu vermeiden
+      if (videoUrl) {
+        URL.revokeObjectURL(videoUrl);
+      }
+      const url = URL.createObjectURL(file);
+      setVideoUrl(url);
+
+      // Vorhandene Subtitles entfernen, da sie zum alten Video gehörten
+      if (videoRef.current) {
+           const existingTracks = videoRef.current.querySelectorAll('track');
+           existingTracks.forEach(track => videoRef.current?.removeChild(track));
+           setSubtitleFile(null); // State auch zurücksetzen
+      }
+
+
+      if (dcRef.current?.readyState === "open") {
+        dcRef.current.send(JSON.stringify({ type: "file", name: file.name }));
+      }
+    }
+  };
 
   async function pollCandidates(pc: RTCPeerConnection, roomId: string | string[]) {
     if (!pc) return;
@@ -342,55 +367,18 @@ export default function RoomPage() {
           </span>
 
           {/* Video-Datei wählen */}
-          <label
-            htmlFor="fileUpload"
-            style={{
-              display: "inline-block",
-              padding: "0.5rem 1rem",
-              backgroundColor: "#555",
-              borderRadius: "8px",
-              cursor: "pointer",
-            }}
-          >
-            🎥 
-          </label>
-          <input
+          <FileUploadButton
             id="fileUpload"
-            type="file"
+            labelContent="🎥"
             accept="video/*"
-            style={{ display: "none" }}
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) {
-                setFile(file);
-                const url = URL.createObjectURL(file);
-                setVideoUrl(url);
-
-                if (dcRef.current?.readyState === "open") {
-                  dcRef.current.send(JSON.stringify({ type: "file", name: file.name }));
-                }
-              }
-            }}
+            onChange={handleVideoUpload}
           />
 
           {/* Untertitel-Datei wählen */}
-          <label
-            htmlFor="subtitleUpload"
-            style={{
-              display: "inline-block",
-              padding: "0.5rem 1rem",
-              backgroundColor: "#555",
-              borderRadius: "8px",
-              cursor: "pointer",
-            }}
-          >
-            📜 
-          </label>
-          <input
+          <FileUploadButton
             id="subtitleUpload"
-            type="file"
+            labelContent="📜"
             accept=".vtt"
-            style={{ display: "none" }}
             onChange={handleSubtitleUpload}
           />
 
@@ -568,7 +556,6 @@ export default function RoomPage() {
           <ChatComponent dcRef={dcRef} />
         </div>}
 
-
       </div>
 
       {showEditor && screenshotRef.current && (
@@ -582,9 +569,6 @@ export default function RoomPage() {
           timestamp={timestamp ?? undefined}
         />
       )}
-
-
     </main>
-
   );
 }
