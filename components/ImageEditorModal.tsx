@@ -311,7 +311,7 @@ export default function ImageEditorModal({
                     {edgeDetection && (
                         <div>
                             <label>Stärke: {edgeStrength}</label>
-                            <input type="range" min={0} max={10} value={edgeStrength} onChange={(e) => setEdgeStrength(parseInt(e.target.value))} style={{ width: "100%" }} />
+                            <input type="range" min={0} max={10} step={0.05} value={edgeStrength} onChange={(e) => setEdgeStrength(parseFloat(e.target.value))} style={{ width: "100%" }} />
                         </div>
                     )}
                 </div>
