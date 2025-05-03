@@ -3,7 +3,7 @@ import React from 'react';
 import { FaCamera } from 'react-icons/fa';
 
 interface ScreenshotButtonProps {
-  videoRef: React.RefObject<HTMLVideoElement>;
+  videoRef: React.RefObject<HTMLVideoElement | null>;
   currentFile: File | null; // Das aktuelle Video-File für den Dateinamen
   onScreenshotTaken: (timestamp: string) => void; // Callback, um den Timestamp zurückzugeben
   style?: React.CSSProperties;

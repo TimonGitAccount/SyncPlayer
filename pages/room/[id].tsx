@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
-import { FaCog, FaCamera, FaEdit } from "react-icons/fa";
+import { FaCog, FaEdit } from "react-icons/fa";
 import ChatComponent from "../../components/Chat";
 import { FaComment } from "react-icons/fa6";
 import ImageEditorModal from "@/components/ImageEditorModal";
