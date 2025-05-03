@@ -7,6 +7,7 @@ import ImageEditorModal from "@/components/ImageEditorModal";
 import VideoSettingsBar from "@/components/VideoSettingsBar";
 import FileUploadButton from "@/components/FileUploadButton";
 import SyncedVideoPlayer from "@/components/SyncedVideoPlayer";
+import ShareLinkButton from "@/components/ShareLinkButton";
 
 const STUN_SERVER = { urls: "stun:stun.l.google.com:19302" };
 
@@ -459,37 +460,11 @@ export default function RoomPage() {
 
         {/* Rechter Bereich */}
         <div style={{ display: "flex", alignItems: "center", gap: "1rem", flexWrap: "wrap" }}>
-          {/* Link-Teilen Button */}
-          <button
-            style={{
-              padding: "0.5rem 1rem",
-              backgroundColor: "#0070f3",
-              color: "#fff",
-              border: "none",
-              borderRadius: "8px",
-              cursor: "pointer",
-              fontSize: "0.9rem",
-            }}
-            onClick={() => {
-              const shareUrl = `${window.location.origin}/room/${roomId}?role=join`;
-              if (navigator.share) {
-                navigator.share({
-                  title: "Sync Player Raum",
-                  text: "Trete meinem Raum bei!",
-                  url: shareUrl,
-                });
-              } else {
-                navigator.clipboard.writeText(shareUrl);
-                alert("Join-Link kopiert!");
-              }
-            }}
-          >
-            🔗 Link teilen
-          </button>
+          <ShareLinkButton roomId={roomId} />
 
           {/* Verbindungsstatus */}
           <span style={{ fontSize: "0.9rem" }}>
-            {isConnected ? "🟢 Verbunden" : "🔄 Verbindung wird aufgebaut..."}
+            {isConnected ? "🟢 Verbunden" : "🔄 Verbindet..."}
           </span>
         </div>
       </div>
