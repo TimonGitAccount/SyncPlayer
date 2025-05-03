@@ -5,7 +5,8 @@ import ChatComponent from "../../components/Chat";
 import { FaComment } from "react-icons/fa6";
 import ImageEditorModal from "@/components/ImageEditorModal";
 import VideoSettingsBar from "@/components/VideoSettingsBar";
-import FileUploadButton from "@/components/FileUploadButton"
+import FileUploadButton from "@/components/FileUploadButton";
+import SyncedVideoPlayer from "@/components/SyncedVideoPlayer";
 
 const STUN_SERVER = { urls: "stun:stun.l.google.com:19302" };
 
@@ -164,6 +165,10 @@ export default function RoomPage() {
         console.warn("Unbekannte Aktion:", action);
     }
   };
+
+  const handleLocalPlay = () => handleControl("play", "local");
+  const handleLocalPause = () => handleControl("pause", "local");
+  const handleLocalSeek = (currentTime: number) => handleControl("seek", "local", currentTime);
 
   async function createAndSendOffer(pc: RTCPeerConnection, roomId: string | string[]) {
     const offer = await pc.createOffer();
@@ -515,42 +520,17 @@ export default function RoomPage() {
           backgroundColor: "#111",
         }}
       >
-        <div
-          style={{
-            flex: 1, // Video bekommt den meisten Platz
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
-          {videoUrl ? (
-            <video
-              ref={videoRef}
-              src={videoUrl || undefined}
-              controls
-              style={{
-                width: "100%",
-                maxWidth: "900px",
-                height: "auto",
-                borderRadius: "12px",
-                filter: `brightness(${brightness}) contrast(${contrast}) saturate(${saturation})`,
-              }}
-              onPlay={() => handleControl("play", "local")}
-              onPause={() => handleControl("pause", "local")}
-              onSeeked={() => {
-                if (ignoreNextSeekRef.current) {
-                  ignoreNextSeekRef.current = false;
-                  return;
-                }
-                if (videoRef.current) {
-                  handleControl("seek", "local", videoRef.current.currentTime);
-                }
-              }}
-            />
-          ) : (
-            <p style={{ color: "#888" }}>Bitte lade eine Video-Datei hoch.</p>
-          )}
-        </div>
+        <SyncedVideoPlayer
+          ref={videoRef} // videoRef wird an die Komponente übergeben
+          src={videoUrl}
+          brightness={brightness}
+          contrast={contrast}
+          saturation={saturation}
+          onPlay={handleLocalPlay}   // Übergabe der Wrapper-Funktionen
+          onPause={handleLocalPause}
+          onSeeked={handleLocalSeek}
+          ignoreNextSeekRef={ignoreNextSeekRef} // Übergabe des Refs
+        />
 
         {isChatOpen && <div style={{ display: "flex", width: "20%", overflow: "hidden" }}>
           <ChatComponent dcRef={dcRef} />
