@@ -8,6 +8,7 @@ import VideoSettingsBar from "@/components/VideoSettingsBar";
 import FileUploadButton from "@/components/FileUploadButton";
 import SyncedVideoPlayer from "@/components/SyncedVideoPlayer";
 import ShareLinkButton from "@/components/ShareLinkButton";
+import ScreenshotButton from "@/components/ScreenshotButton";
 
 const STUN_SERVER = { urls: "stun:stun.l.google.com:19302" };
 
@@ -88,44 +89,6 @@ export default function RoomPage() {
         setTimestamp(new Date(video.currentTime * 1000).toISOString());
       };
       img.src = url;
-    }, "image/png");
-  };
-  
-
-  const handleScreenshot = () => {
-    const video = videoRef.current;
-    if (!video) return;
-  
-    const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-  
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-  
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-  
-    canvas.toBlob((blob) => {
-      if (!blob) return;
-      const url = URL.createObjectURL(blob);
-  
-      // Zeitstempel aus dem Video für den Dateinamen
-      const timestamp = new Date(video.currentTime * 1000)
-        .toISOString()
-        .replace(/[:.]/g, "-")
-        .slice(0, 19);
-  
-      const videoName = file?.name?.split(".")[0] || "screenshot";
-      const filename = `${videoName}-${timestamp}.png`;
-  
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      a.click();
-      URL.revokeObjectURL(url);
-  
-      // Speichern des Timestamps
-      setTimestamp(timestamp);
     }, "image/png");
   };
   
@@ -410,17 +373,11 @@ export default function RoomPage() {
                   <FaCog />
                 </div>
 
-                <div
-                  style={{
-                    fontSize: "1.5rem",
-                    cursor: "pointer",
-                    color: "#fff",
-                  }}
-                  onClick={handleScreenshot}
-                  title="Screenshot aufnehmen"
-                >
-                  <FaCamera />
-                </div>
+                <ScreenshotButton
+                    videoRef={videoRef}
+                    currentFile={file}
+                    onScreenshotTaken={setTimestamp} // setTimestamp kann direkt als Callback übergeben werden
+                />
 
                 {/* Editor öffnen */}
                 <div
