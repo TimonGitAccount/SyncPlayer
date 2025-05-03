@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from 'next/router';
+import { FaPaperPlane } from "react-icons/fa";
 
 interface MessageObject {
     name: string;
@@ -11,59 +12,53 @@ export default function ChatComponent({ dcRef }: { dcRef: React.RefObject<RTCDat
     const { id: roomId, role } = router.query;
 
     const [message, setMessage] = useState("");
-    const [messages, setMessages] = useState<MessageObject[]>([]); // Messages als Array von Objekten speichern
+    const [messages, setMessages] = useState<MessageObject[]>([]);
+    const [isTTSMode, setIsTTSMode] = useState(false);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
-    const isSendingMessage = useRef(false); // useRef für den Sende-Flag, um Race Conditions zu vermeiden
+    const isSendingMessage = useRef(false);
+    const isTTSModeRef = useRef(false); // NEU: Ref für TTS-Zustand
+
+    useEffect(() => {
+        isTTSModeRef.current = isTTSMode; // Synchronisieren
+    }, [isTTSMode]);
 
     const getNameWithEmoji = (role: string) => {
         const emoji = role === 'host' ? '👑' : '🙋';
         const name = role === 'host' ? 'Host' : 'Joiner';
         const nameColor = role === 'host' ? 'red' : 'blue';
-
         return `${emoji} <span style="color:${nameColor}">${name}</span>`;
     };
 
-    // Nachricht an den Server senden
     const sendMessageToAPI = async (messageObject: MessageObject) => {
         try {
             const response = await fetch(`/api/chat/send`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     roomId,
                     sender: messageObject.name,
                     message: messageObject.text,
                 }),
             });
-            if (!response.ok) {
-                console.error("Fehler beim Senden der Nachricht an die API");
-            }
+            if (!response.ok) console.error("Fehler beim Senden der Nachricht an die API");
         } catch (error) {
             console.error("Fehler beim Senden der Nachricht:", error);
         }
     };
 
-    // Nachricht im lokalen Zustand hinzufügen
     const sendMessage = async () => {
         if (message.trim() && dcRef.current?.readyState === "open" && !isSendingMessage.current) {
             isSendingMessage.current = true;
             const name = getNameWithEmoji(role as string);
-            const messageObject: MessageObject = {
-                name: name,
-                text: message.trim()
-            };
+            const messageObject: MessageObject = { name, text: message.trim() };
 
-            // Nachricht lokal hinzufügen
             setMessages((prev) => [...prev, messageObject]);
 
-            // Nachricht an den Data Channel senden
             try {
                 dcRef.current.send(JSON.stringify(messageObject));
-                await sendMessageToAPI(messageObject); // Nachricht über die API senden
-                setMessage(""); // Eingabefeld leeren
+                await sendMessageToAPI(messageObject);
+                setMessage("");
             } catch (error) {
                 console.error("Fehler beim Senden der Nachricht:", error);
             } finally {
@@ -72,17 +67,23 @@ export default function ChatComponent({ dcRef }: { dcRef: React.RefObject<RTCDat
         }
     };
 
-    // Nachricht vom Data Channel empfangen
     const handleReceivedMessage = (event: MessageEvent) => {
         try {
             const decodedMessage: MessageObject = JSON.parse(event.data);
+            console.log("Nachricht empfangen:", decodedMessage);
             setMessages((prev) => [...prev, decodedMessage]);
+
+            if (isTTSModeRef.current) {
+                console.log("TTS ist aktiv, Nachricht wird vorgelesen:", decodedMessage.text);
+                readMessageAloud(decodedMessage.text);
+            } else {
+                console.log("TTS ist deaktiviert");
+            }
         } catch (error) {
             console.error("Fehler beim Verarbeiten der empfangenen Nachricht:", error);
         }
     };
 
-    // Beim Drücken der Enter-Taste Nachricht senden
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();
@@ -90,7 +91,6 @@ export default function ChatComponent({ dcRef }: { dcRef: React.RefObject<RTCDat
         }
     };
 
-    // Laden der Nachrichten vom Server
     const fetchMessages = async () => {
         try {
             const response = await fetch(`/api/chat/get?roomId=${roomId}`);
@@ -105,19 +105,44 @@ export default function ChatComponent({ dcRef }: { dcRef: React.RefObject<RTCDat
         }
     };
 
+    const readMessageAloud = (messageText: string) => {
+        if (typeof window === "undefined" || !window.speechSynthesis) {
+            console.warn("SpeechSynthesis wird nicht unterstützt.");
+            return;
+        }
+
+        const utterance = new SpeechSynthesisUtterance(messageText);
+        utterance.lang = "de-DE";
+        utterance.rate = 1;
+        utterance.pitch = 1;
+        utterance.volume = 1;
+
+        const voices = speechSynthesis.getVoices();
+        if (voices.length > 0) {
+            utterance.voice = voices.find(v => v.lang.startsWith("de")) || voices[0];
+            window.speechSynthesis.speak(utterance);
+        } else {
+            console.warn("Keine Stimmen verfügbar – Warten auf 'onvoiceschanged'");
+            window.speechSynthesis.onvoiceschanged = () => {
+                const loadedVoices = speechSynthesis.getVoices();
+                utterance.voice = loadedVoices.find(v => v.lang.startsWith("de")) || loadedVoices[0];
+                window.speechSynthesis.speak(utterance);
+            };
+        }
+    };
+
+    const toggleTTSMode = () => {
+        setIsTTSMode(prev => !prev);
+        console.log("TTS-Modus umgeschaltet:", !isTTSMode);
+    };
+
     useEffect(() => {
         const dc = dcRef.current;
         if (dc) {
             dc.onmessage = handleReceivedMessage;
-            dc.onopen = () => {
-                console.log("Data channel is open in ChatComponent");
-            };
-            dc.onclose = () => {
-                console.log("Data channel is closed in ChatComponent");
-            };
-            dc.onerror = (error) => {
-                console.error("Data channel error in ChatComponent:", error);
-            };
+            dc.onopen = () => console.log("Data channel is open in ChatComponent");
+            dc.onclose = () => console.log("Data channel is closed in ChatComponent");
+            dc.onerror = (error) => console.error("Data channel error:", error);
         }
 
         return () => {
@@ -131,10 +156,7 @@ export default function ChatComponent({ dcRef }: { dcRef: React.RefObject<RTCDat
     }, [dcRef]);
 
     useEffect(() => {
-        // Nachrichten beim Laden des Chats abrufen
-        if (roomId) {
-            fetchMessages();
-        }
+        if (roomId) fetchMessages();
     }, [roomId]);
 
     useEffect(() => {
@@ -142,24 +164,28 @@ export default function ChatComponent({ dcRef }: { dcRef: React.RefObject<RTCDat
     }, [messages]);
 
     return (
-        <div style={{ padding: "1rem", backgroundColor: "#181818", borderRadius: "8px", flex: "1", maxHeight: "100%" }}>
-            <h3 style={{ fontSize: "1.2rem", marginBottom: "0.5rem", color: "#fff", textAlign: "center" }}>
-                Chat
-            </h3>
+        <div style={{
+            display: "flex", flexDirection: "column", height: "100%", padding: "1rem",
+            backgroundColor: "#181818", borderRadius: "8px", flex: 1, boxSizing: "border-box", width: "100%"
+        }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <h3 style={{ fontSize: "1.2rem", color: "#fff", margin: 0 }}>Chat</h3>
+                <button
+                    onClick={toggleTTSMode}
+                    style={{
+                        background: "none", border: "none", cursor: "pointer",
+                        color: "#fff", fontSize: "1.5rem"
+                    }}
+                >
+                    {isTTSMode ? "🔊" : "🔇"}
+                </button>
+            </div>
 
-            <div
-                style={{
-                    height: "650px",
-                    maxHeight: "650px",
-                    overflowY: "auto",
-                    padding: "0.75rem",
-                    backgroundColor: "#1a1a1a",
-                    borderRadius: "8px",
-                    wordWrap: "break-word",
-                    display: "flex",
-                    flexDirection: "column",
-                }}
-            >
+            <div style={{
+                flex: 1, minHeight: "150px", maxHeight: "50vh", overflowY: "auto",
+                padding: "0.75rem", backgroundColor: "#1a1a1a", borderRadius: "8px",
+                marginTop: "0.75rem", wordWrap: "break-word", display: "flex", flexDirection: "column"
+            }}>
                 {messages.map((msg, index) => (
                     <p key={index} style={{ margin: "0.5rem 0", fontSize: "1rem", color: "#ddd" }}>
                         <span dangerouslySetInnerHTML={{ __html: msg.name + ": " }} />
@@ -169,38 +195,28 @@ export default function ChatComponent({ dcRef }: { dcRef: React.RefObject<RTCDat
                 <div ref={messagesEndRef} />
             </div>
 
-            <div style={{ display: "flex", gap: "0.5rem", marginTop: "1rem" }}>
+            <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.75rem", width: "100%" }}>
                 <textarea
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    placeholder="Nachricht eingeben..."
-                    rows={3}
+                    placeholder="Nachricht"
+                    rows={2}
                     style={{
-                        flex: "1",
-                        padding: "0.75rem",
-                        fontSize: "1rem",
-                        borderRadius: "6px",
-                        border: "1px solid #444",
-                        backgroundColor: "#333",
-                        color: "#fff",
-                        outline: "none",
-                        resize: "none",
+                        flex: 1, padding: "0.75rem", fontSize: "1rem", borderRadius: "6px",
+                        border: "1px solid #444", backgroundColor: "#333", color: "#fff",
+                        outline: "none", resize: "none", width: "100%"
                     }}
                 />
                 <button
                     onClick={sendMessage}
                     style={{
-                        padding: "0.75rem 1.2rem",
-                        backgroundColor: "#0070f3",
-                        color: "#fff",
-                        fontSize: "1rem",
-                        borderRadius: "6px",
-                        border: "none",
-                        cursor: "pointer",
+                        padding: "0 1rem", backgroundColor: "#0070f3", color: "#fff", fontSize: "1rem",
+                        borderRadius: "6px", border: "none", cursor: "pointer", display: "flex",
+                        alignItems: "center", justifyContent: "center", whiteSpace: "nowrap"
                     }}
                 >
-                    Senden
+                    <FaPaperPlane />
                 </button>
             </div>
         </div>
