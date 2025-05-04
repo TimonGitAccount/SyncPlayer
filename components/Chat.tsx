@@ -14,14 +14,20 @@ export default function ChatComponent({ dcRef }: { dcRef: React.RefObject<RTCDat
     const [message, setMessage] = useState("");
     const [messages, setMessages] = useState<MessageObject[]>([]);
     const [isTTSMode, setIsTTSMode] = useState(false);
+    const [isAnimaleseMode, setIsAnimaleseMode] = useState(true);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const isSendingMessage = useRef(false);
-    const isTTSModeRef = useRef(false); // NEU: Ref für TTS-Zustand
+    const isTTSModeRef = useRef(false);
+    const isAnimaleseModeRef = useRef(false);
 
     useEffect(() => {
-        isTTSModeRef.current = isTTSMode; // Synchronisieren
+        isTTSModeRef.current = isTTSMode;
     }, [isTTSMode]);
+
+    useEffect(() => {
+        isAnimaleseModeRef.current = isAnimaleseMode;
+    }, [isAnimaleseMode]);
 
     const getNameWithEmoji = (role: string) => {
         const emoji = role === 'host' ? '👑' : '🙋';
@@ -105,16 +111,36 @@ export default function ChatComponent({ dcRef }: { dcRef: React.RefObject<RTCDat
         }
     };
 
+    const convertToAnimalese = (text: string) => {
+        return text
+            .split("")
+            .map(char => {
+                if (/[a-zA-Z]/.test(char)) {
+                    return char + " ";
+                } else if (char === " ") {
+                    return ".";
+                } else {
+                    return "";
+                }
+            })
+            .join("");
+    };
+
+    
+
     const readMessageAloud = (messageText: string) => {
         if (typeof window === "undefined" || !window.speechSynthesis) {
             console.warn("SpeechSynthesis wird nicht unterstützt.");
             return;
         }
 
-        const utterance = new SpeechSynthesisUtterance(messageText);
-        utterance.lang = "de-DE";
-        utterance.rate = 1;
-        utterance.pitch = 1;
+        const utterance = new SpeechSynthesisUtterance(
+            isAnimaleseModeRef.current ? convertToAnimalese(messageText) : messageText
+        );
+
+        utterance.lang = "en-US";
+        utterance.rate = isAnimaleseModeRef.current ? 12 : 1.25;
+        utterance.pitch = isAnimaleseModeRef.current ? -12 : 1;
         utterance.volume = 1;
 
         const voices = speechSynthesis.getVoices();
@@ -122,7 +148,6 @@ export default function ChatComponent({ dcRef }: { dcRef: React.RefObject<RTCDat
             utterance.voice = voices.find(v => v.lang.startsWith("de")) || voices[0];
             window.speechSynthesis.speak(utterance);
         } else {
-            console.warn("Keine Stimmen verfügbar – Warten auf 'onvoiceschanged'");
             window.speechSynthesis.onvoiceschanged = () => {
                 const loadedVoices = speechSynthesis.getVoices();
                 utterance.voice = loadedVoices.find(v => v.lang.startsWith("de")) || loadedVoices[0];
@@ -134,6 +159,11 @@ export default function ChatComponent({ dcRef }: { dcRef: React.RefObject<RTCDat
     const toggleTTSMode = () => {
         setIsTTSMode(prev => !prev);
         console.log("TTS-Modus umgeschaltet:", !isTTSMode);
+    };
+
+    const toggleVoiceStyle = () => {
+        setIsAnimaleseMode(prev => !prev);
+        console.log("Vorlese-Stil umgeschaltet auf:", !isAnimaleseMode ? "Animalese" : "Normal");
     };
 
     useEffect(() => {
@@ -170,15 +200,28 @@ export default function ChatComponent({ dcRef }: { dcRef: React.RefObject<RTCDat
         }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <h3 style={{ fontSize: "1.2rem", color: "#fff", margin: 0 }}>Chat</h3>
-                <button
-                    onClick={toggleTTSMode}
-                    style={{
-                        background: "none", border: "none", cursor: "pointer",
-                        color: "#fff", fontSize: "1.5rem"
-                    }}
-                >
-                    {isTTSMode ? "🔊" : "🔇"}
-                </button>
+                <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                    <button
+                        onClick={toggleVoiceStyle}
+                        title="Stil wechseln"
+                        style={{
+                            background: "none", border: "none", cursor: "pointer",
+                            color: "#fff", fontSize: "1.5rem"
+                        }}
+                    >
+                        {isAnimaleseMode ? "🐵" : "🗣️"}
+                    </button>
+                    <button
+                        onClick={toggleTTSMode}
+                        title="TTS umschalten"
+                        style={{
+                            background: "none", border: "none", cursor: "pointer",
+                            color: "#fff", fontSize: "1.5rem"
+                        }}
+                    >
+                        {isTTSMode ? "🔊" : "🔇"}
+                    </button>
+                </div>
             </div>
 
             <div style={{

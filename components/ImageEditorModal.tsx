@@ -39,6 +39,10 @@ export default function ImageEditorModal({
     const [edgeDetection, setEdgeDetection] = useState(false);
     const [edgeStrength, setEdgeStrength] = useState(1);
 
+    const [gaussianBlur, setGaussianBlur] = useState(false);
+    const [blurRadius, setBlurRadius] = useState(5); // Standardradius für den Gauß-Filter
+
+
     // Neue State-Variablen für Auflösung
     const [selectedResolution, setSelectedResolution] = useState("original"); // "original", "720p", "1080p", etc.
 
@@ -76,7 +80,13 @@ export default function ImageEditorModal({
             ctx.rotate((rotation * Math.PI) / 180);
             ctx.translate(-canvas.width / 2, -canvas.height / 2);
 
-            ctx.filter = `brightness(${currentBrightness}%) contrast(${currentContrast}%) saturate(${currentSaturation}%)`;
+            ctx.filter = `
+                brightness(${currentBrightness}%)
+                contrast(${currentContrast}%)
+                saturate(${currentSaturation}%)
+                ${gaussianBlur ? `blur(${blurRadius}px)` : ""}
+                `.trim();
+
             ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
             ctx.restore();
 
@@ -89,7 +99,7 @@ export default function ImageEditorModal({
                     data[i + 1] = Math.min(255, Math.max(0, data[i + 1] + greenAdjust));
                     data[i + 2] = Math.min(255, Math.max(0, data[i + 2] + blueAdjust));
                 }
-            }
+            }         
 
             if (edgeDetection) {
                 const width = canvas.width;
@@ -125,7 +135,7 @@ export default function ImageEditorModal({
         };
 
         draw();
-    }, [image, currentBrightness, currentContrast, currentSaturation, rotation, flip, adjustColors, redAdjust, greenAdjust, blueAdjust, edgeDetection, edgeStrength, selectedResolution]);
+    }, [image, currentBrightness, currentContrast, currentSaturation, rotation, flip, adjustColors, redAdjust, greenAdjust, blueAdjust, edgeDetection, edgeStrength, selectedResolution, gaussianBlur, blurRadius]);
 
     const resetAll = () => {
         setCurrentBrightness(100);
@@ -170,7 +180,12 @@ export default function ImageEditorModal({
         ctx.rotate((rotation * Math.PI) / 180);
     
         // Filter anwenden
-        ctx.filter = `brightness(${currentBrightness}%) contrast(${currentContrast}%) saturate(${currentSaturation}%)`;
+        ctx.filter = `
+            brightness(${currentBrightness}%)
+            contrast(${currentContrast}%)
+            saturate(${currentSaturation}%)
+            ${gaussianBlur ? `blur(${blurRadius}px)` : ""}
+            `.trim();
     
         // Bild über gesamte Zielauflösung strecken (kein Zentrieren!)
         ctx.drawImage(image, -outputWidth / 2, -outputHeight / 2, outputWidth, outputHeight);
@@ -315,6 +330,30 @@ export default function ImageEditorModal({
                         </div>
                     )}
                 </div>
+
+                <div style={{ marginBottom: "1rem" }}>
+                    <input 
+                        type="checkbox" 
+                        id="gaussianBlur" 
+                        checked={gaussianBlur} 
+                        onChange={(e) => setGaussianBlur(e.target.checked)} 
+                    />
+                    <label htmlFor="gaussianBlur"> Glättungsfilter (Gauß)</label>
+                    {gaussianBlur && (
+                        <div>
+                            <label>Radius: {blurRadius}</label>
+                            <input 
+                                type="range" 
+                                min={1} 
+                                max={20} 
+                                value={blurRadius} 
+                                onChange={(e) => setBlurRadius(parseInt(e.target.value))}
+                                style={{ width: "100%" }} 
+                            />
+                        </div>
+                    )}
+                </div>
+
 
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
                     <div style={{ display: "flex", alignItems: "center", flex: 1 }}>
